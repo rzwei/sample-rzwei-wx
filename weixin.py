@@ -31,7 +31,7 @@ class dbHelper:
 
     def insertFriend(self, friendid, state=0, updatetime=int(time.time())):
         if self.isFriend(friendid):
-            self.setFriendState(friendid, state)
+            # self.setFriendState(friendid, state)
             return
         self.cx.execute("INSERT INTO friends VALUES (?,?,?,?)",
                         (friendid, state, '', updatetime))
@@ -770,8 +770,7 @@ class WebWeixin(object):
             # 直接联系人
             for member in self.ContactList:
                 if member['UserName'] == id:
-                    name = member['RemarkName'] if member[
-                        'RemarkName'] else member['NickName']
+                    name = member['RemarkName'] if member['RemarkName'] else member['NickName']
             # 群友
             for member in self.GroupMemeberList:
                 if member['UserName'] == id:
@@ -789,7 +788,7 @@ class WebWeixin(object):
         return None
 
     def getUserAlias(self, name):
-        for member in self.MemberList:
+        for member in self.ContactList:
             if name == member['RemarkName'] or name == member['NickName']:
                 return member['Alias'] if member['Alias'] != '' else None
         return None
@@ -871,181 +870,7 @@ class WebWeixin(object):
             logging.info('%s %s -> %s: %s' % (message_id, srcName.strip(),
                                               dstName.strip(), content.replace('<br/>', '\n')))
 
-    #
-    # def handleMsg_old(self, r):
-    #     for msg in r['AddMsgList']:
-    #         print('[*] 你有新的消息，请注意查收')
-    #         logging.debug('[*] 你有新的消息，请注意查收')
-    #
-    #         if self.DEBUG:
-    #             fn = 'msg' + str(int(random.random() * 1000)) + '.json'
-    #             with open(fn, 'w') as f:
-    #                 f.write(json.dumps(msg))
-    #             print('[*] 该消息已储存到文件: ' + fn)
-    #             logging.debug('[*] 该消息已储存到文件: %s' % (fn))
-    #
-    #         msgType = msg['MsgType']
-    #         name = self.getUserRemarkName(msg['FromUserName'])
-    #         content = msg['Content'].replace('&lt;', '<').replace('&gt;', '>')
-    #         msgid = msg['MsgId']
-    #
-    #         if msgType == 1:
-    #             raw_msg = {'raw_msg': msg}
-    #             self._showMsg(raw_msg)
-    #             # 自己加的代码-------------------------------------------#
-    #             # if self.autoReplyRevokeMode:
-    #             #    store
-    #             # 自己加的代码-------------------------------------------#
-    #             if self.autoReplyMode:
-    #                 ans = self._xiaodoubi(content) + '\n[微信机器人自动回复]'
-    #                 if self.webwxsendmsg(ans, msg['FromUserName']):
-    #                     print('自动回复: ' + ans)
-    #                     logging.info('自动回复: ' + ans)
-    #                 else:
-    #                     print('自动回复失败')
-    #                     logging.info('自动回复失败')
-    #         elif msgType == 3:
-    #             image = self.webwxgetmsgimg(msgid)
-    #             raw_msg = {'raw_msg': msg,
-    #                        'message': '%s 发送了一张图片: %s' % (name, image)}
-    #             self._showMsg(raw_msg)
-    #             self._safe_open(image)
-    #         elif msgType == 34:
-    #             voice = self.webwxgetvoice(msgid)
-    #             raw_msg = {'raw_msg': msg,
-    #                        'message': '%s 发了一段语音: %s' % (name, voice)}
-    #             self._showMsg(raw_msg)
-    #             self._safe_open(voice)
-    #
-    #         elif msgType == 37:
-    #
-    #             def add_friend_thread(userName, VerifyUserTicket='', status=3, autoUpdate=True):
-    #                 url = '%s/webwxverifyuser?r=%s&pass_ticket=%s' % (
-    #                     self.base_uri, int(time.time()), self.pass_ticket)
-    #                 data = {
-    #                     'BaseRequest': self.BaseRequest,
-    #                     'Opcode': status,
-    #                     'VerifyUserListSize': 1,
-    #                     'VerifyUserList': [{
-    #                         'Value': userName,
-    #                         'VerifyUserTicket': VerifyUserTicket, }],
-    #                     'VerifyContent': '',
-    #                     'SceneListCount': 1,
-    #                     'SceneList': [33],
-    #                     'skey': self.skey, }
-    #
-    #                 time.sleep(random.randint(2, 5))
-    #                 self.mywebwxstatusnotify()
-    #                 time.sleep(random.randint(2, 5))
-    #                 r = self._post(url, data)
-    #                 if r['BaseResponse']['Ret'] != 0:
-    #                     print('[*] 添加失败,请联系管理员', r)
-    #                 else:
-    #                     print('[*] 添加成功', msg['RecommendInfo']['NickName'])
-    #                     self.db.insertFriend(msg['RecommendInfo']['UserName'], -1)
-    #                     self.db.commit()
-    #
-    #                     # self.webwxgetcontact()
-    #                     self.ContactList.append(
-    #                         {'UserName': msg['RecommendInfo']['UserName'], 'NickName': msg['RecommendInfo']['NickName'],
-    #                          'VerifyFlag': 0})
-    #
-    #                     with open("./myJson/AfterAddFriendToReply.json", encoding='utf-8') as fin:
-    #                         msgs = json.load(fin)
-    #                         msgIndex = random.randint(0, len(msgs) - 1)
-    #                         for i, m in enumerate(msgs):
-    #                             if i == msgIndex:
-    #                                 replyKey = m
-    #                                 break
-    #                     # time.sleep(random.randint(30, 60))
-    #                     self.sendMsg(name, msgs[replyKey])
-    #                     time.sleep(5 * 60)
-    #                     state = self.db.getFriendState(name)
-    #                     if state != -1:
-    #                         return
-    #                     with open("./myJson/AddwaitFive.json", encoding='utf-8') as fin:
-    #                         msgs = json.load(fin)
-    #                         msgIndex = random.randint(0, len(msgs) - 1)
-    #                         for i, m in enumerate(msgs):
-    #                             if i == msgIndex:
-    #                                 replyKey = m
-    #                                 break
-    #                         self.sendMsg(name, msgs[replyKey])
-    #                     time.sleep(5 * 60)
-    #                     if self.db.getFriendState(name) != -1:
-    #                         return
-    #                     with open('./myJson/AddSecWaitFive.json') as fin:
-    #                         msgs = json.load(fin)
-    #                         for i, m in enumerate(msgs):
-    #                             if i == msgIndex:
-    #                                 replyKey = m
-    #                                 break
-    #                     self.sendMsg(name, msgs[replyKey])
-    #                     self.db.addFriendState(name)
-    #                     self.db.commit()
-    #
-    #             threading.Thread(target=add_friend_thread,
-    #                              args=(msg['RecommendInfo']['UserName'], msg['RecommendInfo']['Ticket'])).start()
-    #
-    #         elif msgType == 42:
-    #             info = msg['RecommendInfo']
-    #             print('%s 发送了一张名片:' % name)
-    #             print('=========================')
-    #             print('= 昵称: %s' % info['NickName'])
-    #             print('= 微信号: %s' % info['Alias'])
-    #             print('= 地区: %s %s' % (info['Province'], info['City']))
-    #             print('= 性别: %s' % ['未知', '男', '女'][info['Sex']])
-    #             print('=========================')
-    #             raw_msg = {'raw_msg': msg, 'message': '%s 发送了一张名片: %s' % (
-    #                 name.strip(), json.dumps(info))}
-    #             self._showMsg(raw_msg)
-    #         elif msgType == 47:
-    #             url = self._searchContent('cdnurl', content)
-    #             raw_msg = {'raw_msg': msg,
-    #                        'message': '%s 发了一个动画表情，点击下面链接查看: %s' % (name, url)}
-    #             self._showMsg(raw_msg)
-    #             self._safe_open(url)
-    #         elif msgType == 49:
-    #             appMsgType = defaultdict(lambda: "")
-    #             appMsgType.update({5: '链接', 3: '音乐', 7: '微博'})
-    #             print('%s 分享了一个%s:' % (name, appMsgType[msg['AppMsgType']]))
-    #             print('=========================')
-    #             print('= 标题: %s' % msg['FileName'])
-    #             print('= 描述: %s' % self._searchContent('des', content, 'xml'))
-    #             print('= 链接: %s' % msg['Url'])
-    #             print('= 来自: %s' % self._searchContent(
-    #                 'appname', content, 'xml'))
-    #             print('=========================')
-    #             card = {
-    #                 'title': msg['FileName'],
-    #                 'description': self._searchContent('des', content, 'xml'),
-    #                 'url': msg['Url'],
-    #                 'appname': self._searchContent('appname', content, 'xml')
-    #             }
-    #             raw_msg = {'raw_msg': msg, 'message': '%s 分享了一个%s: %s' % (
-    #                 name, appMsgType[msg['AppMsgType']], json.dumps(card))}
-    #             self._showMsg(raw_msg)
-    #         elif msgType == 51:
-    #             raw_msg = {'raw_msg': msg, 'message': '[*] 成功获取联系人信息'}
-    #             self._showMsg(raw_msg)
-    #         elif msgType == 62:
-    #             video = self.webwxgetvideo(msgid)
-    #             raw_msg = {'raw_msg': msg,
-    #                        'message': '%s 发了一段小视频: %s' % (name, video)}
-    #             self._showMsg(raw_msg)
-    #             self._safe_open(video)
-    #         elif msgType == 10002:
-    #             raw_msg = {'raw_msg': msg, 'message': '%s 撤回了一条消息' % name}
-    #             self._showMsg(raw_msg)
-    #         else:
-    #             logging.debug('[*] 该消息类型为: %d，可能是表情，图片, 链接或红包: %s' %
-    #                           (msg['MsgType'], json.dumps(msg)))
-    #             raw_msg = {
-    #                 'raw_msg': msg, 'message': '[*] 该消息类型为: %d，可能是表情，图片, 链接或红包' % msg['MsgType']}
-    #             self._showMsg(raw_msg)
-
     def handleMsg(self, r):
-
         for msg in r['AddMsgList']:
             print('[*] 你有新的消息，请注意查收')
             logging.debug('[*] 你有新的消息，请注意查收')
@@ -1058,14 +883,6 @@ class WebWeixin(object):
                 logging.debug('[*] 该消息已储存到文件: %s' % (fn))
 
             msgType = msg['MsgType']
-            name = self.getUserRemarkName(msg['FromUserName'])
-            # name = msg['FromUserName']
-            content = msg['Content'].replace('&lt;', '<').replace('&gt;', '>')
-            msgid = msg['MsgId']
-
-            alias = self.getUserAlias(name)
-            if alias is None:
-                alias = name
 
             # try:
             #     self._showMsg({'raw_msg': msg})
@@ -1079,7 +896,7 @@ class WebWeixin(object):
                     key = msg['RecommendInfo']['Alias']
                     if key == '':
                         key = msg['RecommendInfo']['NickName']
-
+                    print('[*] 添加好友申请', key)
                     url = '%s/webwxverifyuser?r=%s&pass_ticket=%s' % (
                         self.base_uri, int(time.time()), self.pass_ticket)
                     data = {
@@ -1102,11 +919,14 @@ class WebWeixin(object):
                     if r['BaseResponse']['Ret'] != 0:
                         print('[*] 添加失败,请联系管理员', r)
                     else:
-                        print('[*] 添加成功', msg['RecommendInfo']['Alias'])
+                        print('[*] 添加成功', key)
                         self.db.insertFriend(key, -1)
                         self.db.commit()
                         # self.webwxgetcontact()
+                        msg['RecommendInfo']['RemarkName'] = msg['RecommendInfo']['NickName']
                         self.ContactList.append(msg['RecommendInfo'])
+
+                        name = msg['RecommendInfo']['UserName']
 
                         with open("./myJson/AfterAddFriendToReply.json", encoding='utf-8') as fin:
                             msgs = json.load(fin)
@@ -1115,11 +935,11 @@ class WebWeixin(object):
                                 if i == msgIndex:
                                     replyKey = m
                                     break
-                        time.sleep(random.randint(60, 2 * 60))
-                        state = self.db.getFriendState(alias)
+                        time.sleep(random.randint(10, 30))
+                        state = self.db.getFriendState(key)
                         if state != -1:
                             return
-                        self.sendMsg(name, msgs[replyKey])
+                        self.webwxsendmsg(msgs[replyKey], name)
                         time.sleep(5 * 60)
                         with open("./myJson/AddwaitFive.json", encoding='utf-8') as fin:
                             msgs = json.load(fin)
@@ -1128,9 +948,10 @@ class WebWeixin(object):
                                 if i == msgIndex:
                                     replyKey = m
                                     break
-                        self.sendMsg(name, msgs[replyKey])
+
+                        self.webwxsendmsg(msgs[replyKey], name)
                         time.sleep(5 * 60)
-                        if self.db.getFriendState(alias) != -1:
+                        if self.db.getFriendState(key) != -1:
                             return
                         with open('./myJson/AddSecWaitFive.json') as fin:
                             msgs = json.load(fin)
@@ -1138,8 +959,9 @@ class WebWeixin(object):
                                 if i == msgIndex:
                                     replyKey = m
                                     break
-                        self.sendMsg(name, msgs[replyKey])
-                        self.db.addFriendState(alias)
+                        # self.sendMsg(name, msgs[replyKey])
+                        self.webwxsendmsg(msgs[replyKey], name)
+                        self.db.addFriendState(key)
                         self.db.commit()
 
                 threading.Thread(target=add_friend_thread,
@@ -1165,6 +987,15 @@ class WebWeixin(object):
                         break
                 return iskey
 
+            name = self.getUserRemarkName(msg['FromUserName'])
+            # name = msg['FromUserName']
+            content = msg['Content'].replace('&lt;', '<').replace('&gt;', '>')
+            msgid = msg['MsgId']
+
+            alias = self.getUserAlias(name)
+            if alias is None:
+                alias = name
+
             if not self.db.isFriend(alias):
                 # self.db.insertFriend(name, 100)
                 # self.db.commit()
@@ -1174,6 +1005,8 @@ class WebWeixin(object):
             state = self.db.getFriendState(alias)
 
             if state == -1:
+                if not isTextMsg(msgType) or not isImgMsg(msgType):
+                    return
                 self.db.addFriendState(alias)
                 self.db.commit()
                 state += 2
@@ -1337,29 +1170,16 @@ class WebWeixin(object):
 
     def startDomean(self):
 
-        def fun(self, id):
-            url = self.base_uri + \
-                  '/webwxgetheadimg?username=%s&skey=%s' % (id, self.skey)
-            data = self._get(url)
-            if data == '':
-                return ''
-            fn = 'img_' + id + '.jpg'
-            return True
-
         def tfun(self):
             while True:
                 time.sleep(random.randint(10, 60))
                 index = random.randint(0, len(self.ContactList) - 1)
-                print(time.strftime('%Y-%m-%d %H-%M-%S',
-                                    time.localtime(time.time())), 'aliving')
-                for i, member in enumerate(self.ContactList):
-                    if i == index:
-                        try:
-                            fun(self, member['UserName'])
-                        except Exception as e:
-                            # print(e)
-                            pass
-                    break
+                string = time.strftime('%Y-%m-%d %H-%M-%S', time.localtime(time.time()))
+
+                if self.webwxsendmsg(string):
+                    print(string, 'aliving')
+                else:
+                    print(string, 'died !')
 
         threading.Thread(target=tfun, args=(self,)).start()
         print('[*] 伪装线程启动')
