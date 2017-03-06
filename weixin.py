@@ -884,10 +884,15 @@ class WebWeixin(object):
 
             msgType = msg['MsgType']
 
-            # try:
-            #     self._showMsg({'raw_msg': msg})
-            # except:
-            #     print('显示信息失败 ')
+            content = msg['Content'].replace(
+                '&lt;', '<').replace('&gt;', '>')
+
+            # 判断msgType=1000
+
+            if content == '收到红包，请在手机上查看':
+                self.webwxsendmsg("[色][色][色]哇哦～谢谢宝宝，thankssss[鼓掌]", msg[
+                    'raw_msg']["FromUserName"])
+                return
 
             if msgType == 37:
 
@@ -896,6 +901,11 @@ class WebWeixin(object):
                     key = msg['RecommendInfo']['Alias']
                     if key == '':
                         key = msg['RecommendInfo']['NickName']
+
+                    # for member in self.ContactList:
+                    #     if key == member['Alias'] if member['Alias'] != '' else member['NickName']:
+                    #         return
+
                     print('[*] 添加好友申请', key)
                     url = '%s/webwxverifyuser?r=%s&pass_ticket=%s' % (
                         self.base_uri, int(time.time()), self.pass_ticket)
@@ -920,11 +930,16 @@ class WebWeixin(object):
                         print('[*] 添加失败,请联系管理员', r)
                     else:
                         print('[*] 添加成功', key)
+                        if self.db.isFriend(key):
+                            return
+
                         self.db.insertFriend(key, -1)
                         self.db.commit()
                         # self.webwxgetcontact()
                         msg['RecommendInfo']['RemarkName'] = msg['RecommendInfo']['NickName']
                         self.ContactList.append(msg['RecommendInfo'])
+                        self.MemberList.append(msg['RecommendInfo'])
+                        self.MemberCount += 1
 
                         name = msg['RecommendInfo']['UserName']
 
@@ -936,8 +951,7 @@ class WebWeixin(object):
                                     replyKey = m
                                     break
                         time.sleep(random.randint(10, 30))
-                        state = self.db.getFriendState(key)
-                        if state != -1:
+                        if self.db.getFriendState(key) != -1:
                             return
                         self.webwxsendmsg(msgs[replyKey], name)
                         time.sleep(5 * 60)
@@ -948,17 +962,19 @@ class WebWeixin(object):
                                 if i == msgIndex:
                                     replyKey = m
                                     break
-
-                        self.webwxsendmsg(msgs[replyKey], name)
-                        time.sleep(5 * 60)
                         if self.db.getFriendState(key) != -1:
                             return
+                        self.webwxsendmsg(msgs[replyKey], name)
+                        time.sleep(5 * 60)
+
                         with open('./myJson/AddSecWaitFive.json') as fin:
                             msgs = json.load(fin)
                             for i, m in enumerate(msgs):
                                 if i == msgIndex:
                                     replyKey = m
                                     break
+                        if self.db.getFriendState(key) != -1:
+                            return
                         # self.sendMsg(name, msgs[replyKey])
                         self.webwxsendmsg(msgs[replyKey], name)
                         self.db.addFriendState(key)
@@ -989,7 +1005,7 @@ class WebWeixin(object):
 
             name = self.getUserRemarkName(msg['FromUserName'])
             # name = msg['FromUserName']
-            content = msg['Content'].replace('&lt;', '<').replace('&gt;', '>')
+            # content = msg['Content'].replace('&lt;', '<').replace('&gt;', '>')
             msgid = msg['MsgId']
 
             alias = self.getUserAlias(name)
@@ -1005,8 +1021,9 @@ class WebWeixin(object):
             state = self.db.getFriendState(alias)
 
             if state == -1:
-                if not isTextMsg(msgType) or not isImgMsg(msgType):
+                if not isTextMsg(msgType) and not isImgMsg(msgType):
                     return
+                self.db.addFriendState(alias)
                 self.db.addFriendState(alias)
                 self.db.commit()
                 state += 2
@@ -1040,13 +1057,15 @@ class WebWeixin(object):
                     # mediaId = r['MediaId']
                     # self.webwxsendmsgimg(name, mediaId)
                     self.db.setFriendState(alias, -2)
+                    self.db.commit()
                     time.sleep(random.randint(60, 60 * 2))
-                    self.db.setFriendState(alias, 1)
+                    # self.db.setFriendState(alias, 1)
+                    # self.db.commit()
                     self.sendImg(name, replyImg)
                     time.sleep(1)
                     # self.webwxsendmsg(msgText, name)
                     self.sendMsg(name, msgText)
-                    self.db.addFriendState(alias)
+                    self.db.setFriendState(alias, 2)
                     self.db.commit()
 
                     time.sleep(30 * 60)
@@ -1148,7 +1167,7 @@ class WebWeixin(object):
                             break
                     replyImg = m['img']
                     replyMsgs = m['msg']
-                    time.sleep(random.randint(30, 60))
+                    time.sleep(random.randint(10, 30))
                     self.sendImg(name, replyImg)
                     time.sleep(1)
                     for i in range(1, len(replyMsgs)):
@@ -1165,8 +1184,8 @@ class WebWeixin(object):
             elif state == 5:
                 if isKey(content):
                     self.sendMsg(name, '宝宝才占卜过吧，我记得应该没到一周吧，连续占卜可是对运势无益的')
-            else:
-                print('state :', state)
+
+            print(name, 'state :', state)
 
     def startDomean(self):
 
