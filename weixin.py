@@ -920,8 +920,7 @@ class WebWeixin(object):
             # 判断msgType=1000
 
             if content == '收到红包，请在手机上查看':
-                self.webwxsendmsg("[色][色][色]哇哦～谢谢宝宝，thankssss[鼓掌]", msg[
-                    'raw_msg']["FromUserName"])
+                self.webwxsendmsg("[色][色][色]哇哦～谢谢宝宝，thankssss[鼓掌]", msg["FromUserName"])
                 return
 
             if msgType == 37:
