@@ -20,9 +20,12 @@ import requests
 from lxml import html
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
+lock = threading.Lock()
+
 
 class dbHelper:
     def __init__(self, dbName):
+        self.lock = threading.Lock()
         self.db = sqlite3.connect(dbName, check_same_thread=False)
         self.cx = self.db.cursor()
         self.cx.execute(
@@ -30,55 +33,80 @@ class dbHelper:
         self.commit()
 
     def insertFriend(self, friendid, state=0, updatetime=int(time.time())):
+
         if self.isFriend(friendid):
             # self.setFriendState(friendid, state)
             return
+
+        self.lock.acquire()
         self.cx.execute("INSERT INTO friends VALUES (?,?,?,?)",
                         (friendid, state, '', updatetime))
+        self.lock.release()
 
     def isFriend(self, friendid):
+        self.lock.acquire()
         raws = self.cx.execute(
             "select * from friends where userid='%s'" % (friendid))
+        self.lock.release()
+
         for r in raws:
             return True
         return False
 
     def getFriendState(self, friendid):
+        self.lock.acquire()
         raws = self.cx.execute(
             "select state from friends WHERE userid='%s'" % (friendid))
+        self.lock.release()
+
         for raw in raws:
             return raw[0]
 
     def setFriendState(self, friendid, state):
+        self.lock.acquire()
         self.cx.execute(
             "update friends set state=%d where userid='%s'" % (state, friendid))
+        self.lock.release()
 
     def addFriendState(self, friendid):
+        self.lock.acquire()
         self.cx.execute(
             "update friends set state=state+1 WHERE userid='%s'" % (friendid))
+        self.lock.release()
 
     def getFriendTime(self, friendid):
+        self.lock.acquire()
         raws = self.cx.execute(
             "select updatetime from friends WHERE userid='%s'" % (friendid))
+        self.lock.release()
+
         for raw in raws:
             return raw[0]
 
     def setFriendTime(self, friendid, t=int(time.time())):
+        self.lock.acquire()
         self.cx.execute(
             "update friends set updatetime=%d WHERE userid='%s'" % (t, friendid))
+        self.lock.release()
 
     def getRandomFriend(self):
         now = int(time.time())
+        self.lock.acquire()
         raws = self.cx.execute(
             "select userid from friends where updatetime<=%d and state==0" % (now - 2 * 24 * 60 * 60))
+        self.lock.release()
+
         for raw in raws:
             return raw[0]
 
     def updatedb(self):
+        self.lock.acquire()
         now = int(time.time())
         self.cx.execute(
             'update friends set state=0 where updatetime<=%d and state=5' % (now - 7 * 24 * 60 * 60))
         self.cx.execute('UPDATE friends SET state =0 WHERE state=-2')
+        self.lock.release()
+
         self.commit()
 
     # def enterGame(self, friendid):
@@ -93,7 +121,9 @@ class dbHelper:
     #     self.cx.execute("update friends set game=0 where userid='%s'" % (friendid))
 
     def commit(self):
+        self.lock.acquire()
         self.db.commit()
+        self.lock.release()
 
     def __del__(self):
         self.commit()
@@ -896,22 +926,20 @@ class WebWeixin(object):
 
             if msgType == 37:
 
-                def add_friend_thread(userName, VerifyUserTicket='', status=3, autoUpdate=True):
+                def add_friend_thread(msg):
 
                     key = msg['RecommendInfo']['Alias']
                     if key == '':
                         key = msg['RecommendInfo']['NickName']
-
-                    # for member in self.ContactList:
-                    #     if key == member['Alias'] if member['Alias'] != '' else member['NickName']:
-                    #         return
+                    userName = msg['RecommendInfo']['UserName']
+                    VerifyUserTicket = msg['RecommendInfo']['Ticket']
 
                     print('[*] 添加好友申请', key)
                     url = '%s/webwxverifyuser?r=%s&pass_ticket=%s' % (
                         self.base_uri, int(time.time()), self.pass_ticket)
                     data = {
                         'BaseRequest': self.BaseRequest,
-                        'Opcode': status,
+                        'Opcode': 3,
                         'VerifyUserListSize': 1,
                         'VerifyUserList': [{
                             'Value': userName,
@@ -956,7 +984,7 @@ class WebWeixin(object):
                         if self.db.getFriendState(key) != -1:
                             return
                         self.webwxsendmsg(msgs[replyKey], name)
-                        time.sleep(random.randint(60, 60 * 3))
+                        time.sleep(random.randint(5 * 60, 60 * 10))
                         with open("./myJson/AddwaitFive.json", encoding='utf-8') as fin:
                             msgs = json.load(fin)
                             msgIndex = random.randint(0, len(msgs) - 1)
@@ -967,7 +995,7 @@ class WebWeixin(object):
                         if self.db.getFriendState(key) != -1:
                             return
                         self.webwxsendmsg(msgs[replyKey], name)
-                        time.sleep(5 * 60)
+                        time.sleep(random.randint(5 * 60, 10 * 60))
 
                         with open('./myJson/AddSecWaitFive.json', encoding='utf-8') as fin:
                             msgs = json.load(fin)
@@ -983,7 +1011,7 @@ class WebWeixin(object):
                         self.db.commit()
 
                 threading.Thread(target=add_friend_thread,
-                                 args=(msg['RecommendInfo']['UserName'], msg['RecommendInfo']['Ticket'])).start()
+                                 args=(msg,)).start()
                 return
 
             def isTextMsg(msgType):
@@ -1095,10 +1123,10 @@ class WebWeixin(object):
                             if i == index:
                                 replyMsg = msgs[key]
                                 break
-                    time.sleep(random.randint(10, 30))
+                    time.sleep(random.randint(10, 20))
                     self.sendMsg(name, replyMsg)
 
-                    time.sleep(random.randint(60, 60 * 2))
+                    time.sleep(random.randint(30, 60))
 
                     with open('./myJson/SmsgAndImg.json', encoding='utf-8') as fin:
                         msgs = json.load(fin)
@@ -1112,6 +1140,8 @@ class WebWeixin(object):
 
                     self.db.setFriendState(alias, 4)
                     self.db.commit()
+
+                    print(name, '等待数字')
 
                     time.sleep(5 * 60)
                     if self.db.getFriendState(alias) == 4:
@@ -1134,10 +1164,10 @@ class WebWeixin(object):
                     return
                 num = -1
                 try:
-                    print(content)
+                    print(name, content)
                     num = int(content)
                 except:
-                    print('[*] 转化失败', content)
+                    print(name, '[*] 转化失败', content)
                 if num < 1 or num > 22:
                     with open('./myJson/NotNumTips.json', encoding='utf-8') as fin:
                         msgs = json.load(fin)
@@ -1154,7 +1184,7 @@ class WebWeixin(object):
                     self.db.setFriendState(alias, -2)
                     self.db.commit()
 
-                    with open('./myJson /TenSecMsg.json', encoding='utf-8') as fin:
+                    with open('./myJson/TenSecMsg.json', encoding='utf-8') as fin:
                         msgs = json.load(fin)
                     index = random.randint(0, len(msgs) - 1)
                     for i, k in enumerate(msgs):
