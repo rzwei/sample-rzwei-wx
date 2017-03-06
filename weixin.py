@@ -930,16 +930,18 @@ class WebWeixin(object):
                         print('[*] 添加失败,请联系管理员', r)
                     else:
                         print('[*] 添加成功', key)
-                        if self.db.isFriend(key):
-                            return
 
-                        self.db.insertFriend(key, -1)
-                        self.db.commit()
                         # self.webwxgetcontact()
                         msg['RecommendInfo']['RemarkName'] = msg['RecommendInfo']['NickName']
                         self.ContactList.append(msg['RecommendInfo'])
                         self.MemberList.append(msg['RecommendInfo'])
                         self.MemberCount += 1
+
+                        if self.db.isFriend(key):
+                            return
+
+                        self.db.insertFriend(key, -1)
+                        self.db.commit()
 
                         name = msg['RecommendInfo']['UserName']
 
@@ -950,11 +952,11 @@ class WebWeixin(object):
                                 if i == msgIndex:
                                     replyKey = m
                                     break
-                        time.sleep(random.randint(10, 30))
+                        time.sleep(random.randint(5, 10))
                         if self.db.getFriendState(key) != -1:
                             return
                         self.webwxsendmsg(msgs[replyKey], name)
-                        time.sleep(5 * 60)
+                        time.sleep(random.randint(60, 60 * 3))
                         with open("./myJson/AddwaitFive.json", encoding='utf-8') as fin:
                             msgs = json.load(fin)
                             msgIndex = random.randint(0, len(msgs) - 1)
@@ -967,7 +969,7 @@ class WebWeixin(object):
                         self.webwxsendmsg(msgs[replyKey], name)
                         time.sleep(5 * 60)
 
-                        with open('./myJson/AddSecWaitFive.json') as fin:
+                        with open('./myJson/AddSecWaitFive.json', encoding='utf-8') as fin:
                             msgs = json.load(fin)
                             for i, m in enumerate(msgs):
                                 if i == msgIndex:
@@ -1032,7 +1034,6 @@ class WebWeixin(object):
                 if isTextMsg(msgType) and isKey(content):
                     print('[*] 收到关键字')
                     self.db.addFriendState(alias)
-
                     self.db.commit()
                     state += 1
 
@@ -1058,7 +1059,7 @@ class WebWeixin(object):
                     # self.webwxsendmsgimg(name, mediaId)
                     self.db.setFriendState(alias, -2)
                     self.db.commit()
-                    time.sleep(random.randint(60, 60 * 2))
+                    time.sleep(random.randint(10, 30))
                     # self.db.setFriendState(alias, 1)
                     # self.db.commit()
                     self.sendImg(name, replyImg)
@@ -1153,7 +1154,7 @@ class WebWeixin(object):
                     self.db.setFriendState(alias, -2)
                     self.db.commit()
 
-                    with open('./myJson/TenSecMsg.json', encoding='utf-8') as fin:
+                    with open('./myJson /TenSecMsg.json', encoding='utf-8') as fin:
                         msgs = json.load(fin)
                     index = random.randint(0, len(msgs) - 1)
                     for i, k in enumerate(msgs):
@@ -1493,8 +1494,8 @@ class WebWeixin(object):
         result = None
         if type(data) == str:
             result = data
-        elif type(data) != str:
-            result = data.decode('utf-8')
+        # elif type(data) != str:
+        #     result = data.decode('utf-8')
         return result
 
     def _get(self, url: object, api: object = None) -> object:
