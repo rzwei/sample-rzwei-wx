@@ -951,6 +951,8 @@ class WebWeixin(object):
                     time.sleep(random.randint(60, 5 * 60))
                     self.mywebwxstatusnotify()
                     time.sleep(random.randint(5, 10))
+                    if self.db.isFriend(key):
+                        return
 
                     r = self._post(url, data)
                     if r['BaseResponse']['Ret'] != 0:
@@ -1285,7 +1287,11 @@ class WebWeixin(object):
                 if selector == '2':
                     r = self.webwxsync()
                     if r is not None:
-                        self.handleMsg(r)
+                        try:
+                            self.handleMsg(r)
+                        except Exception as e:
+                            print(e)
+
                 elif selector == '6':
                     # TODO
                     redEnvelope += 1
@@ -1293,7 +1299,10 @@ class WebWeixin(object):
                     logging.debug('[*] 收到疑似红包消息 %d 次' % redEnvelope)
                     r = self.webwxsync()
                     if r is not None:
-                        self.handleMsg(r)
+                        try:
+                            self.handleMsg(r)
+                        except Exception as e:
+                            print(e)
 
             elif selector == '7':
                 playWeChat += 1
