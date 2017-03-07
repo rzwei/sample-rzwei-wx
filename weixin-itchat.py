@@ -82,8 +82,17 @@ class dbHelper:
             "select userid from friends where updatetime<=%d and state==0" % (now - 2 * 24 * 60 * 60))
         self.lock.release()
 
+        users = []
         for raw in raws:
-            return raw[0]
+            users.append(raw)
+
+        if len(users) > 0:
+            index = random.randint(0, len(users) - 1)
+            for i, raw in enumerate(users):
+                if i == index:
+                    return raw[0]
+        else:
+            return None
 
     def updatedb(self):
         self.lock.acquire()
@@ -199,7 +208,7 @@ def isKey(content):
 def startDomean():
     def tfun():
         while True:
-            time.sleep(random.randint(10, 60))
+            time.sleep(random.randint(60 * 5, 60 * 8))
             string = time.strftime('%Y-%m-%d %H-%M-%S', time.localtime(time.time()))
             if itchat.send(string, 'filehelper'):
                 print(string, 'aliving')
@@ -224,52 +233,61 @@ def startRandomSelectThread():
         msgs = json.load(fin)
 
     def tfun():
-        time.sleep(60 * 60)
-        index = random.randint(0, len(msgs) - 1)
-        for i, m in enumerate(msgs):
-            if i == index:
-                msg = msgs[m]
-        name = db.getRandomFriend()
-        db.setFriendTime(name)
-        db.commit()
-        name = itchat.search_friends(name=name)
+        while True:
+            time.sleep(60 * 60)
+            index = random.randint(0, len(msgs) - 1)
+            for i, m in enumerate(msgs):
+                if i == index:
+                    msg = msgs[m]
+            name = db.getRandomFriend()
 
-        if len(name) != 0:
-            name = name[0]
-            itchat.send(msg, name)
+            if name == None:
+                continue
+
+            db.setFriendTime(name)
+            db.commit()
+            name = itchat.search_friends(name=name)
+
+            print(name)
+
+            try:
+                if type(name) == list:
+                    if len(name) != 0:
+                        name = name[0]
+                        itchat.send(msg, name['UserName'])
+                elif type(name) == dict:
+                    itchat.send(msg, name['UserName'])
+            except Exception as e:
+                print(e)
 
     threading.Thread(target=tfun).start()
     print('[*] 随机发送线程启动')
 
 
-@itchat.msg_register([itchat.content.SYSTEM])
+@itchat.msg_register([itchat.content.NOTE])
 def receiveHB(msg):
-    print('SYSTEM', msg)
-    if msg['Text'] == '收到红包，请在手机上查看':
-        itchat.send('[色][色][色]哇哦～谢谢宝宝，thankssss[鼓掌]', msg['FromUserName'])
+    def fun():
+        time.sleep(random.randint(2, 5))
+        if msg['Text'] == '收到红包，请在手机上查看':
+            itchat.send('[色][色][色]哇哦～谢谢宝宝，thankssss[鼓掌]', msg['FromUserName'])
+
+    threading.Thread(target=fun).start()
 
 
 @itchat.msg_register([itchat.content.TEXT, itchat.content.PICTURE])
 def fun(msg):
-    print('TEXT', msg)
-
     user = msg['FromUserName']
     user = itchat.search_friends(userName=user)
     if user == []:
         print(user, 'not found!')
         return
-
     key = user['Alias'] if user['Alias'] != '' else user['NickName']
     userid = user['UserName']
     content = msg['Content']
-
     if not db.isFriend(key):
         print(key, 'not friend')
         return
-
     state = db.getFriendState(key)
-    # print(key, state)
-
 
     if state == -1:
         db.addFriendState(key)
