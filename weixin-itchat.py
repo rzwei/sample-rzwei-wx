@@ -5,6 +5,7 @@ import threading
 import time
 
 import itchat
+import requests
 
 db = None
 
@@ -79,9 +80,27 @@ class dbHelper:
         now = int(time.time())
         self.lock.acquire()
         raws = self.cx.execute(
-            "select userid from friends where updatetime<=%d and state==0" % (now - 2 * 24 * 60 * 60))
+            "select userid from friends where updatetime<=%d and state==0" % (now - 24 * 60 * 60))
         self.lock.release()
 
+        users = []
+        for raw in raws:
+            users.append(raw)
+
+        if len(users) > 0:
+            index = random.randint(0, len(users) - 1)
+            for i, raw in enumerate(users):
+                if i == index:
+                    return raw[0]
+        else:
+            return None
+
+    def getWeekFriend(self):
+        now = int(time.time())
+        self.lock.acquire()
+        raws = self.cx.execute(
+            "select userid from friends where updatetime<=%d and state==5" % (now - 7 * 24 * 60 * 60))
+        self.lock.release()
         users = []
         for raw in raws:
             users.append(raw)
@@ -219,16 +238,16 @@ def startDomean():
     print('[*] 伪装线程启动')
 
 
-def startDailyThread():
-    def fun():
-        time.sleep(24 * 60 * 60)
-        db.updatedb()
+# def startDailyThread():
+#     def fun():
+#         time.sleep(24 * 60 * 60)
+#         db.updatedb()
+#
+#     threading.Thread(target=fun).start()
+#     print('[*] 日常清理线程启动')
 
-    threading.Thread(target=fun).start()
-    print('[*] 日常清理线程启动')
 
-
-def startRandomSelectThread():
+def eachWeekCheck():
     with open('./myJson/eachWeekTips.json', encoding='utf-8') as fin:
         msgs = json.load(fin)
 
@@ -239,17 +258,44 @@ def startRandomSelectThread():
             for i, m in enumerate(msgs):
                 if i == index:
                     msg = msgs[m]
-            name = db.getRandomFriend()
-
+            name = db.getWeekFriend()
             if name == None:
                 continue
+            db.setFriendTime(name)
+            db.setFriendState(name, 0)
+            db.commit()
+            name = itchat.search_friends(name=name)
+            try:
+                if type(name) == list:
+                    if len(name) != 0:
+                        name = name[0]
+                        itchat.send(msg, name['UserName'])
+                elif type(name) == dict:
+                    itchat.send(msg, name['UserName'])
+            except Exception as e:
+                print(e)
 
+    threading.Thread(target=tfun).start()
+    print('[*] 每周发送线程启动')
+
+
+def dailyCheck():
+    with open('./myJson/AfterAddFriendToReply.json', encoding='utf-8') as fin:
+        msgs = json.load(fin)
+
+    def tfun():
+        while True:
+            time.sleep(60 * 60)
+            index = random.randint(0, len(msgs) - 1)
+            for i, m in enumerate(msgs):
+                if i == index:
+                    msg = msgs[m]
+            name = db.getRandomFriend()
+            if name == None:
+                continue
             db.setFriendTime(name)
             db.commit()
             name = itchat.search_friends(name=name)
-
-            # print(name)
-
             try:
                 if type(name) == list:
                     if len(name) != 0:
@@ -262,6 +308,17 @@ def startRandomSelectThread():
 
     threading.Thread(target=tfun).start()
     print('[*] 随机发送线程启动')
+
+
+def tulingReply(msg, key):
+    apiUrl = 'http://www.tuling123.com/openapi/api'
+    data = {
+        'key': 'b1219f3a0fef4562a1d4bba2db76eb9c',  # 如果这个Tuling Key不能用，那就换一个
+        'info': msg,  # 这是我们发出去的消息
+        'userid': key,  # 这里你想改什么都可以
+    }
+    r = requests.post(apiUrl, data).json()
+    return r.get('text', '我好像出了些问题')
 
 
 @itchat.msg_register([itchat.content.NOTE])
@@ -301,7 +358,8 @@ def fun(msg):
             db.addFriendState(key)
             db.commit()
             state += 1
-
+        else:
+            return tulingReply(msg['Text'], key)
     if state == 1:
         def tfun0(name, key):
             db.setFriendState(key, -2)
@@ -450,6 +508,8 @@ def fun(msg):
     elif state == 5:
         if isKey(content):
             itchat.send('宝宝才占卜过吧，我记得应该没到一周吧，连续占卜可是对运势无益的', userid)
+        else:
+            return tulingReply(msg['Text'], key)
 
 
 if __name__ == '__main__':
@@ -470,7 +530,7 @@ if __name__ == '__main__':
     db.commit()
 
     startDomean()
-    startDailyThread()
-    startRandomSelectThread()
+    dailyCheck()
+    eachWeekCheck()
 
     itchat.run()
