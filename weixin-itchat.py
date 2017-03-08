@@ -248,7 +248,7 @@ def startRandomSelectThread():
             db.commit()
             name = itchat.search_friends(name=name)
 
-            print(name)
+            # print(name)
 
             try:
                 if type(name) == list:
@@ -266,12 +266,12 @@ def startRandomSelectThread():
 
 @itchat.msg_register([itchat.content.NOTE])
 def receiveHB(msg):
-    def fun():
-        time.sleep(random.randint(2, 5))
-        if msg['Text'] == '收到红包，请在手机上查看':
+    if msg['Text'] == '收到红包，请在手机上查看':
+        def fun():
+            time.sleep(random.randint(2, 5))
             itchat.send('[色][色][色]哇哦～谢谢宝宝，thankssss[鼓掌]', msg['FromUserName'])
 
-    threading.Thread(target=fun).start()
+        threading.Thread(target=fun).start()
 
 
 @itchat.msg_register([itchat.content.TEXT, itchat.content.PICTURE])
@@ -453,7 +453,7 @@ def fun(msg):
 
 
 if __name__ == '__main__':
-    itchat.auto_login(True)
+    itchat.auto_login(hotReload=True)
     # time.sleep(10)
     friendsList = itchat.get_friends(update=False)
     # with open('contacts.json', 'w', encoding='utf-8') as fout:

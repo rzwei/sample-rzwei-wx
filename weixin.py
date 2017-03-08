@@ -20,8 +20,6 @@ import requests
 from lxml import html
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
-lock = threading.Lock()
-
 
 class dbHelper:
     def __init__(self, dbName):
@@ -106,7 +104,6 @@ class dbHelper:
             'update friends set state=0 where updatetime<=%d and state=5' % (now - 7 * 24 * 60 * 60))
         self.cx.execute('UPDATE friends SET state =0 WHERE state=-2')
         self.lock.release()
-
         self.commit()
 
     # def enterGame(self, friendid):
@@ -1244,7 +1241,7 @@ class WebWeixin(object):
         print('[*] 日常清理线程启动')
 
     def startRandomSelectThread(self):
-        with open('./myJson/AfterAddFriendToReply.json', encoding='utf-8') as fin:
+        with open('./myJson/eachWeekTips.json', encoding='utf-8') as fin:
             msgs = json.load(fin)
 
         def tfun(self):
