@@ -331,8 +331,21 @@ def receiveHB(msg):
         threading.Thread(target=fun).start()
 
 
+robotReply = False
+
 @itchat.msg_register([itchat.content.TEXT, itchat.content.PICTURE])
 def fun(msg):
+    global robotReply
+
+    if msg['ToUserName'] == 'filehelper':
+        if msg['Text'] == 'shutdown robot':
+            robotReply = False
+            print('关闭robot')
+        elif msg['Text'] == 'turn on robot':
+            robotReply = True
+            print('打开robot')
+        return
+
     user = msg['FromUserName']
     user = itchat.search_friends(userName=user)
     if user == []:
@@ -358,8 +371,13 @@ def fun(msg):
             db.addFriendState(key)
             db.commit()
             state += 1
-        else:
-            return tulingReply(msg['Text'], key)
+        elif robotReply:
+            def ttfun(userid):
+                r = tulingReply(msg['Text'], key)
+                time.sleep(random.randint(1, 5))
+                itchat.send(r, userid)
+
+            threading.Thread(target=ttfun, args=(userid,)).start()
     if state == 1:
         def tfun0(name, key):
             db.setFriendState(key, -2)
@@ -508,11 +526,19 @@ def fun(msg):
     elif state == 5:
         if isKey(content):
             itchat.send('宝宝才占卜过吧，我记得应该没到一周吧，连续占卜可是对运势无益的', userid)
-        else:
-            return tulingReply(msg['Text'], key)
+        elif robotReply:
+            def ttfun(userid):
+                r = tulingReply(msg['Text'], key)
+                time.sleep(random.randint(1, 5))
+                itchat.send(r, userid)
+
+            threading.Thread(target=ttfun, args=(userid,)).start()
 
 
 if __name__ == '__main__':
+
+    robotReply = False
+
     itchat.auto_login(hotReload=True)
     # time.sleep(10)
     friendsList = itchat.get_friends(update=False)
