@@ -569,23 +569,20 @@ def myQRCallback(uuid, status, qrcode):
 
 
 def setProcessInfo():
-    basePath = ''
-
     try:
         with open('server.ini', encoding='utf-8') as fin:
             serverPath = fin.readline()
     except:
         serverPath = ''
-
-    print('serverPath', serverPath)
-
+    print('serverPath:', serverPath)
     with open(serverPath + 'pinfo.ini', 'w', encoding='utf-8') as fout:
         import os
+        # print(os.getcwd())
         fout.write(str(os.getpid()) + '\n')
-    with open(serverPath + 'path.ini', 'w', encoding='utf-8') as fout:
-        import sys
-        print(sys.argv[0])
-        fout.write(sys.argv[0] + '\n')
+        # with open(serverPath + 'path.ini', 'w', encoding='utf-8') as fout:
+        #     import sys
+        #     print(sys.argv[0])
+        #     fout.write(sys.argv[0] + '\n')
 
 
 def reAddFriends():
