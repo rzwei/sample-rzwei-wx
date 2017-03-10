@@ -19,7 +19,7 @@ class dbHelper:
             "CREATE TABLE IF NOT EXISTS friends  (userid TEXT PRIMARY KEY, state INT,message TEXT,updatetime INT)")
         self.commit()
 
-    def insertFriend(self, friendid, state=0, updatetime=int(time.time())):
+    def insertFriend(self, friendid, state=0, message='', updatetime=int(time.time())):
 
         if self.isFriend(friendid):
             # self.setFriendState(friendid, state)
@@ -27,7 +27,7 @@ class dbHelper:
 
         self.lock.acquire()
         self.cx.execute("INSERT INTO friends VALUES (?,?,?,?)",
-                        (friendid, state, '', updatetime))
+                        (friendid, state, message, updatetime))
         self.lock.release()
 
     def isFriend(self, friendid):
@@ -134,6 +134,17 @@ class dbHelper:
     # def leaveGame(self, friendid):
     #     self.cx.execute("update friends set game=0 where userid='%s'" % (friendid))
 
+
+    def getAddFriendsFailed(self):
+        self.lock.acquire()
+        raws = self.cx.execute("SELECT message friends WHERE state==-3")
+        self.lock.release()
+
+        ret = []
+        for raw in raws:
+            ret.append(raw[0])
+        return ret
+
     def commit(self):
         self.lock.acquire()
         self.db.commit()
@@ -145,67 +156,75 @@ class dbHelper:
         self.db.close()
 
 
+def add_friend_thread(msg, flag=0):
+    key = msg['RecommendInfo']['Alias']
+    if key == '':
+        key = msg['RecommendInfo']['NickName']
+    # msg['RecommendInfo']['RemarkName'] = key
+
+    print('[*] 添加好友申请', key)
+
+    if flag == 0:
+        tmsg = json.dump(msg)
+        db.insertFriend(key, -3, tmsg)
+        db.commit()
+
+    time.sleep(random.randint(60, 5 * 60))
+
+    itchat.add_friend(**msg['Text'])
+
+    if db.getFriendState(key) != -3:
+        return
+
+    db.setFriendState(key, -1)
+    db.commit()
+
+    name = msg['RecommendInfo']['UserName']
+    with open("./myJson/AfterAddFriendToReply.json", encoding='utf-8') as fin:
+        msgs = json.load(fin)
+        msgIndex = random.randint(0, len(msgs) - 1)
+        for i, m in enumerate(msgs):
+            if i == msgIndex:
+                replyKey = m
+                break
+
+    time.sleep(random.randint(5, 10))
+    if db.getFriendState(key) != -1:
+        return
+
+    itchat.send(msgs[replyKey], name)
+
+    with open('con.json', 'w', encoding='utf-8') as fout:
+        json.dump(itchat.get_friends(), fout)
+
+    time.sleep(random.randint(5 * 60, 60 * 10))
+    with open("./myJson/AddwaitFive.json", encoding='utf-8') as fin:
+        msgs = json.load(fin)
+        msgIndex = random.randint(0, len(msgs) - 1)
+        for i, m in enumerate(msgs):
+            if i == msgIndex:
+                replyKey = m
+                break
+    if db.getFriendState(key) != -1:
+        return
+    itchat.send(msgs[replyKey], name)
+
+    time.sleep(random.randint(5 * 60, 10 * 60))
+    with open('./myJson/AddSecWaitFive.json', encoding='utf-8') as fin:
+        msgs = json.load(fin)
+        for i, m in enumerate(msgs):
+            if i == msgIndex:
+                replyKey = m
+                break
+    if db.getFriendState(key) != -1:
+        return
+    itchat.send(msgs[replyKey], name)
+    db.addFriendState(key)
+    db.commit()
+
+
 @itchat.msg_register(itchat.content.FRIENDS)
 def add_friend(msg):
-    def add_friend_thread(msg):
-        key = msg['RecommendInfo']['Alias']
-        if key == '':
-            key = msg['RecommendInfo']['NickName']
-        # msg['RecommendInfo']['RemarkName'] = key
-
-
-        print('[*] 添加好友申请', key)
-
-        time.sleep(random.randint(60, 5 * 60))
-
-        itchat.add_friend(**msg['Text'])
-
-        if db.isFriend(key):
-            return
-        db.insertFriend(key, -1)
-        db.commit()
-        name = msg['RecommendInfo']['UserName']
-        with open("./myJson/AfterAddFriendToReply.json", encoding='utf-8') as fin:
-            msgs = json.load(fin)
-            msgIndex = random.randint(0, len(msgs) - 1)
-            for i, m in enumerate(msgs):
-                if i == msgIndex:
-                    replyKey = m
-                    break
-        time.sleep(random.randint(5, 10))
-        if db.getFriendState(key) != -1:
-            return
-
-        itchat.send(msgs[replyKey], name)
-
-        with open('con.json', 'w', encoding='utf-8') as fout:
-            json.dump(itchat.get_friends(), fout)
-
-        time.sleep(random.randint(5 * 60, 60 * 10))
-        with open("./myJson/AddwaitFive.json", encoding='utf-8') as fin:
-            msgs = json.load(fin)
-            msgIndex = random.randint(0, len(msgs) - 1)
-            for i, m in enumerate(msgs):
-                if i == msgIndex:
-                    replyKey = m
-                    break
-        if db.getFriendState(key) != -1:
-            return
-        itchat.send(msgs[replyKey], name)
-
-        time.sleep(random.randint(5 * 60, 10 * 60))
-        with open('./myJson/AddSecWaitFive.json', encoding='utf-8') as fin:
-            msgs = json.load(fin)
-            for i, m in enumerate(msgs):
-                if i == msgIndex:
-                    replyKey = m
-                    break
-        if db.getFriendState(key) != -1:
-            return
-        itchat.send(msgs[replyKey], name)
-        db.addFriendState(key)
-        db.commit()
-
     threading.Thread(target=add_friend_thread,
                      args=(msg,)).start()
 
@@ -333,6 +352,7 @@ def receiveHB(msg):
 
 robotReply = False
 
+
 @itchat.msg_register([itchat.content.TEXT, itchat.content.PICTURE])
 def fun(msg):
     global robotReply
@@ -410,13 +430,13 @@ def fun(msg):
             db.setFriendState(key, 2)
             db.commit()
 
-            time.sleep(30 * 60)
-
-            if db.getFriendState(key) > 2:
-                return
-
-            db.setFriendState(key, 0)
-            db.commit()
+            # time.sleep(30 * 60)
+            #
+            # if db.getFriendState(key) > 2:
+            #     return
+            #
+            # db.setFriendState(key, 0)
+            # db.commit()
 
         threading.Thread(target=tfun0, args=(userid, key)).start()
     elif state == 2:  # 等待图图片
@@ -464,10 +484,10 @@ def fun(msg):
                             replyMsg = msgs[k]
                             break
                 itchat.send(replyMsg, name)
-                time.sleep(60 * 60)  # 超过一小时重置
-                if db.getFriendState(key) == 4:
-                    db.setFriendState(key, 0)
-                    db.commit()
+                # time.sleep(60 * 60)  # 超过一小时重置
+                # if db.getFriendState(key) == 4:
+                #     db.setFriendState(key, 0)
+                #     db.commit()
 
         threading.Thread(target=fun3, args=(userid, key)).start()
     elif state == 4:  # 等待数字
@@ -535,11 +555,54 @@ def fun(msg):
             threading.Thread(target=ttfun, args=(userid,)).start()
 
 
+def myQRCallback(uuid, status, qrcode):
+    try:
+        with open('server.ini', encoding='utf-8') as fin:
+            serverPath = fin.readline()
+    except:
+        serverPath = ''
+    picDir = serverPath + 'qr.png'
+    # itchat.utils.print_cmd_qr(qrcode.text(1), enableCmdQR=2)
+    with open(picDir, 'wb') as f:
+        f.write(qrcode)
+        # itchat.utils.print_qr(picDir)
+
+
+def setProcessInfo():
+    basePath = ''
+
+    try:
+        with open('server.ini', encoding='utf-8') as fin:
+            serverPath = fin.readline()
+    except:
+        serverPath = ''
+
+    print('serverPath', serverPath)
+
+    with open(serverPath + 'pinfo.ini', 'w', encoding='utf-8') as fout:
+        import os
+        fout.write(str(os.getpid()) + '\n')
+    with open(serverPath + 'path.ini', 'w', encoding='utf-8') as fout:
+        import sys
+        print(sys.argv[0])
+        fout.write(sys.argv[0] + '\n')
+
+
+def reAddFriends():
+    friendlist = db.getAddFriendsFailed()
+    if len(friendlist) == 0:
+        return
+    for msg in friendlist:
+        threading.Thread(target=add_friend_thread, args=(msg, 1)).start()
+
+
 if __name__ == '__main__':
 
     robotReply = False
 
-    itchat.auto_login(hotReload=True)
+    setProcessInfo()
+
+    itchat.auto_login(hotReload=True, qrCallback=myQRCallback)
     # time.sleep(10)
     friendsList = itchat.get_friends(update=False)
     # with open('contacts.json', 'w', encoding='utf-8') as fout:
@@ -555,8 +618,9 @@ if __name__ == '__main__':
             db.insertFriend(key)
     db.commit()
 
+    reAddFriends()
     startDomean()
-    dailyCheck()
+    # dailyCheck()
     eachWeekCheck()
 
     itchat.run()
