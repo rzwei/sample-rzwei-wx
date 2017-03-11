@@ -137,7 +137,7 @@ class dbHelper:
 
     def getAddFriendsFailed(self):
         self.lock.acquire()
-        raws = self.cx.execute("SELECT message friends WHERE state==-3")
+        raws = self.cx.execute("SELECT message FROM friends WHERE state=-3")
         self.lock.release()
 
         ret = []
@@ -156,7 +156,7 @@ class dbHelper:
         self.db.close()
 
 
-def add_friend_thread(msg, flag=0):
+def add_friend_thread(msg):
     key = msg['RecommendInfo']['Alias']
     if key == '':
         key = msg['RecommendInfo']['NickName']
@@ -164,19 +164,20 @@ def add_friend_thread(msg, flag=0):
 
     print('[*] 添加好友申请', key)
 
-    if flag == 0:
-        tmsg = json.dump(msg)
-        db.insertFriend(key, -3, tmsg)
-        db.commit()
+    #
+    # if flag == 0:
+    #     tmsg = json.dumps(msg)
+    # db.insertFriend(key, -3)
+    # db.commit()
 
     time.sleep(random.randint(60, 5 * 60))
 
     itchat.add_friend(**msg['Text'])
 
-    if db.getFriendState(key) != -3:
+    if db.isFriend(key):
         return
 
-    db.setFriendState(key, -1)
+    db.insertFriend(key, -1)
     db.commit()
 
     name = msg['RecommendInfo']['UserName']
@@ -367,16 +368,23 @@ def fun(msg):
         return
 
     user = msg['FromUserName']
+
     user = itchat.search_friends(userName=user)
+
     if user == []:
-        print(user, 'not found!')
+        print(user, 'not found!1')
+        t
         return
+
     key = user['Alias'] if user['Alias'] != '' else user['NickName']
     userid = user['UserName']
     content = msg['Content']
+
     if not db.isFriend(key):
-        print(key, 'not friend')
-        return
+        db.insertFriend(key, 0)
+        db.commit()
+        print('添加', key)
+
     state = db.getFriendState(key)
 
     if state == -1:
@@ -587,9 +595,14 @@ def setProcessInfo():
 
 def reAddFriends():
     friendlist = db.getAddFriendsFailed()
+
     if len(friendlist) == 0:
         return
-    for msg in friendlist:
+    msgs = []
+    for message in friendlist:
+        msgs.append(json.loads(message))
+
+    for msg in msgs:
         threading.Thread(target=add_friend_thread, args=(msg, 1)).start()
 
 
@@ -599,7 +612,7 @@ if __name__ == '__main__':
 
     setProcessInfo()
 
-    itchat.auto_login(hotReload=True, qrCallback=myQRCallback)
+    itchat.auto_login(hotReload=False, qrCallback=myQRCallback)
     # time.sleep(10)
     friendsList = itchat.get_friends(update=False)
     # with open('contacts.json', 'w', encoding='utf-8') as fout:
@@ -615,7 +628,7 @@ if __name__ == '__main__':
             db.insertFriend(key)
     db.commit()
 
-    reAddFriends()
+    # reAddFriends()
     startDomean()
     # dailyCheck()
     eachWeekCheck()
